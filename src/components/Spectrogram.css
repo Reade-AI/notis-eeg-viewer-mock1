@@ -1,0 +1,171 @@
+.spectrogram {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 800px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease, min-height 0.3s ease;
+  overflow: hidden;
+}
+
+.spectrogram-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(16, 185, 129, 0.05) 100%);
+  border-bottom: 2px solid rgba(16, 185, 129, 0.2);
+  flex-shrink: 0;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  height: 64px;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.spectrogram-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+  margin: 0;
+  padding: 0;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.spectrogram-header h2::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.spectrogram-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+}
+
+.panel-toggle-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.panel-toggle-btn:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--text-secondary);
+}
+
+.panel-toggle-btn.active {
+  background-color: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #10b981;
+}
+
+.color-scale {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
+.export-spectrogram-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.export-spectrogram-btn:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.export-spectrogram-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.color-bar {
+  width: 100px;
+  height: 12px;
+  background: linear-gradient(to right, 
+    rgb(0, 0, 50),    /* Dark blue */
+    rgb(0, 0, 150),   /* Blue */
+    rgb(0, 100, 100), /* Cyan */
+    rgb(100, 100, 0), /* Yellow */
+    rgb(255, 255, 0)  /* Bright yellow */
+  );
+  border: 1px solid var(--border-color);
+  transition: border-color 0.3s ease;
+}
+
+.channels-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 12px;
+  padding: 12px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.channel-spectrogram {
+  position: relative;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 150px;
+  height: 100%;
+  overflow: hidden;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.spectrogram-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.spectrogram-canvas {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-tertiary);
+  max-width: 100%;
+  max-height: 100%;
+  transition: background-color 0.3s ease;
+}

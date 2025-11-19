@@ -1,0 +1,186 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
+  overflow: hidden;
+}
+
+.app-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+
+.main-panels {
+  display: flex;
+  flex: 1;
+  transition: margin-right 0.3s ease;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.compact-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 280px;
+  min-width: 280px;
+  border-right: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+  z-index: 100;
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
+  transform: translateX(-100%);
+}
+
+.compact-sidebar.open {
+  transform: translateX(0);
+}
+
+.center-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.main-eeg-panel {
+  flex: 1;
+  min-width: 50%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid var(--border-color);
+}
+
+.spectral-panels {
+  flex: 1;
+  min-width: 50%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+}
+
+.spectrogram-panel {
+  flex: 0 0 800px;
+  min-height: 800px;
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+  transition: flex 0.3s ease;
+}
+
+/* When CSA is hidden, give more space to spectrogram */
+.spectral-panels.csa-hidden .spectrogram-panel {
+  flex: 0 0 1000px;
+  min-height: 1000px;
+}
+
+.spectral-panels.csa-hidden .spectrogram-panel .spectrogram {
+  min-height: 1000px;
+}
+
+/* When QDSA is hidden, give more space to spectrogram */
+.spectral-panels.qdsa-hidden .spectrogram-panel {
+  flex: 0 0 1000px;
+  min-height: 1000px;
+}
+
+.spectral-panels.qdsa-hidden .spectrogram-panel .spectrogram {
+  min-height: 1000px;
+}
+
+/* When both are hidden, give even more space */
+.spectral-panels.csa-hidden.qdsa-hidden .spectrogram-panel {
+  flex: 0 0 1200px;
+  min-height: 1200px;
+}
+
+.spectral-panels.csa-hidden.qdsa-hidden .spectrogram-panel .spectrogram {
+  min-height: 1200px;
+}
+
+.csa-panel {
+  flex: 0 0 500px;
+  min-height: 500px;
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.quadrant-dsa-panel {
+  flex: 0 0 500px;
+  min-height: 500px;
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.spectrogram-panel:last-child,
+.csa-panel:last-child,
+.quadrant-dsa-panel:last-child {
+  border-bottom: none;
+}
+
+.main-panels.settings-open {
+  margin-right: 400px;
+}
+
+.main-panels.compact-sidebar-open {
+  margin-left: 280px;
+}
+
+.main-panels.event-log-open {
+  margin-right: 320px;
+}
+
+.main-panels.settings-open.event-log-open {
+  margin-right: 720px;
+}
+
+.main-panels.compact-sidebar-open.event-log-open {
+  margin-left: 280px;
+  margin-right: 320px;
+}
+
+.main-panels.compact-sidebar-open.settings-open {
+  margin-left: 280px;
+  margin-right: 400px;
+}
+
+.main-panels.compact-sidebar-open.settings-open.event-log-open {
+  margin-left: 280px;
+  margin-right: 720px;
+}
+
+/* Legacy panel classes - kept for compatibility but not used in new layout */
+.left-panel {
+  flex: 1;
+  border-right: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  min-width: 0;
+  min-height: 0;
+}
+
+.right-panel {
+  flex: 1;
+  background-color: var(--bg-tertiary);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Event Log positioning handled in EventLog.css */
