@@ -1,0 +1,218 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - generic [ref=e15]:
+        - heading "NOTIS EEG Viewer" [level=1] [ref=e16]
+        - generic [ref=e17]: MOCK 1
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]: D00122876406-D001718252
+          - generic [ref=e21]: FRAGA_ELISEO
+          - generic [ref=e22]: OR
+        - button "Edit Patient Information" [ref=e23] [cursor=pointer]:
+          - img [ref=e24]
+    - generic [ref=e26]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e32]: Device
+          - generic [ref=e33]: Connected
+        - generic [ref=e34]:
+          - generic [ref=e37]: Stream
+          - generic [ref=e38]: Active
+        - generic [ref=e39]:
+          - generic [ref=e42]: EDF
+          - generic [ref=e43]: Loaded (50:060.0)
+        - generic [ref=e44]:
+          - generic [ref=e45]: Duration
+          - generic [ref=e46]: 0:003.9
+      - generic [ref=e47]:
+        - button "📁 Load EDF" [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]: 📁
+          - generic [ref=e50]: Load EDF
+        - button "🔄 Reset" [ref=e51] [cursor=pointer]:
+          - generic [ref=e52]: 🔄
+          - generic [ref=e53]: Reset
+        - button "▶ Start" [disabled] [ref=e54]:
+          - generic [ref=e55]: ▶
+          - generic [ref=e56]: Start
+        - button "⏸ Pause" [ref=e57] [cursor=pointer]:
+          - generic [ref=e58]: ⏸
+          - generic [ref=e59]: Pause
+        - button "⏹ Stop" [ref=e60] [cursor=pointer]:
+          - generic [ref=e61]: ⏹
+          - generic [ref=e62]: Stop
+    - generic [ref=e64]:
+      - button "Ischemia Detection Alerts" [ref=e66] [cursor=pointer]:
+        - img [ref=e67]
+      - 'button "Switch to dark mode (Currently: light)" [ref=e69] [cursor=pointer]':
+        - img [ref=e70]
+      - button "Show Compact EEG Views (US, UD, TS, TD)" [ref=e72] [cursor=pointer]:
+        - img [ref=e73]
+      - button "Show Event Log (Clinical Events & Annotations)" [ref=e75] [cursor=pointer]:
+        - img [ref=e76]
+      - button "Show Settings Panel (Display, Spectrogram, Detection, etc.)" [ref=e78] [cursor=pointer]:
+        - img [ref=e79]
+  - generic [ref=e82]:
+    - generic [ref=e84]:
+      - generic [ref=e85]:
+        - generic [ref=e86]:
+          - heading "US - Live" [level=4] [ref=e87]
+          - generic [ref=e88]:
+            - button "🔍" [ref=e89] [cursor=pointer]
+            - button "↔" [ref=e90] [cursor=pointer]
+            - button "⚙" [ref=e91] [cursor=pointer]
+        - generic [ref=e92]:
+          - generic [ref=e93]:
+            - generic [ref=e94]: F3-P3
+            - img [ref=e96]
+          - generic [ref=e97]:
+            - generic [ref=e98]: P3-O1
+            - img [ref=e100]
+      - generic [ref=e101]:
+        - generic [ref=e102]:
+          - heading "UD - Live" [level=4] [ref=e103]
+          - generic [ref=e104]:
+            - button "🔍" [ref=e105] [cursor=pointer]
+            - button "↔" [ref=e106] [cursor=pointer]
+            - button "⚙" [ref=e107] [cursor=pointer]
+        - generic [ref=e108]:
+          - generic [ref=e109]:
+            - generic [ref=e110]: F3-T3
+            - img [ref=e112]
+          - generic [ref=e113]:
+            - generic [ref=e114]: T3-O1
+            - img [ref=e116]
+      - generic [ref=e117]:
+        - generic [ref=e118]:
+          - heading "TS - Live" [level=4] [ref=e119]
+          - generic [ref=e120]:
+            - button "🔍" [ref=e121] [cursor=pointer]
+            - button "↔" [ref=e122] [cursor=pointer]
+            - button "⚙" [ref=e123] [cursor=pointer]
+        - generic [ref=e124]:
+          - generic [ref=e125]:
+            - generic [ref=e126]: F4-P4
+            - img [ref=e128]
+          - generic [ref=e129]:
+            - generic [ref=e130]: P4-O2
+            - img [ref=e132]
+      - generic [ref=e133]:
+        - generic [ref=e134]:
+          - heading "TD - Live" [level=4] [ref=e135]
+          - generic [ref=e136]:
+            - button "🔍" [ref=e137] [cursor=pointer]
+            - button "↔" [ref=e138] [cursor=pointer]
+            - button "⚙" [ref=e139] [cursor=pointer]
+        - generic [ref=e140]:
+          - generic [ref=e141]:
+            - generic [ref=e142]: F4-T4
+            - img [ref=e144]
+          - generic [ref=e145]:
+            - generic [ref=e146]: T4-O2
+            - img [ref=e148]
+    - generic [ref=e149]:
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - heading "Raw EEG Live 00:04" [level=2] [ref=e153]
+          - generic [ref=e154]:
+            - combobox "Montage" [ref=e155] [cursor=pointer]:
+              - option "BANANA" [selected]
+              - option "10-20"
+              - option "BIPOLAR"
+              - option "REFERENCE"
+            - combobox "Low Frequency Filter" [ref=e156] [cursor=pointer]:
+              - option "LFF 0.1 Hz"
+              - option "LFF 0.5 Hz"
+              - option "LFF 1.0 Hz" [selected]
+              - option "LFF 5.0 Hz"
+            - combobox "High Frequency Filter" [ref=e157] [cursor=pointer]:
+              - option "HFF 15 Hz"
+              - option "HFF 30 Hz" [selected]
+              - option "HFF 50 Hz"
+              - option "HFF 70 Hz"
+            - combobox "Notch Filter" [ref=e158] [cursor=pointer]:
+              - option "Notch Off"
+              - option "Notch 50 Hz"
+              - option "Notch 60 Hz" [selected]
+            - combobox "Sensitivity" [ref=e159] [cursor=pointer]:
+              - option "Sensitivity 2.5 uV/mm"
+              - option "Sensitivity 5.0 uV/mm"
+              - option "Sensitivity 7.0 uV/mm" [selected]
+              - option "Sensitivity 10.0 uV/mm"
+              - option "Sensitivity 20.0 uV/mm"
+            - generic [ref=e160]:
+              - generic [ref=e161]: "Timebase:"
+              - button "−" [ref=e162] [cursor=pointer]
+              - spinbutton [ref=e163]: "30"
+              - generic [ref=e164]: mm/sec
+              - button "+" [ref=e165] [cursor=pointer]
+            - generic [ref=e166]:
+              - generic [ref=e167]: "Time Window:"
+              - button "−" [ref=e168] [cursor=pointer]
+              - spinbutton [ref=e169]: "10"
+              - generic [ref=e170]: sec
+              - button "+" [ref=e171] [cursor=pointer]
+            - generic [ref=e172]:
+              - button "←" [disabled] [ref=e173]
+              - button "→" [disabled] [ref=e174]
+              - button "⟳" [disabled] [ref=e175]
+        - generic [ref=e176]:
+          - generic [ref=e177]:
+            - generic [ref=e178]: Timeline Navigation
+            - generic [ref=e179]: 0.0s
+          - generic [ref=e180]:
+            - generic [ref=e181]: 0.0s
+            - 'slider "Navigate timeline: 0.0s - 4.0s" [ref=e182] [cursor=pointer]': "4"
+            - generic [ref=e183]: 4.0s
+          - generic [ref=e184]:
+            - generic [ref=e185]: "View Range:"
+            - generic [ref=e186]: 0.0s - 4.0s
+        - generic [ref=e187]:
+          - generic "Double-click to mark/unmark channel as bad" [ref=e188]:
+            - img [ref=e189]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e190]:
+            - img [ref=e191]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e192]:
+            - img [ref=e193]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e194]:
+            - img [ref=e195]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e196]:
+            - img [ref=e197]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e198]:
+            - img [ref=e199]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e200]:
+            - img [ref=e201]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e202]:
+            - img [ref=e203]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e204]:
+            - img [ref=e205]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e206]:
+            - img [ref=e207]
+          - generic "Double-click to mark/unmark channel as bad" [ref=e208]:
+            - img [ref=e209]
+      - generic [ref=e210]:
+        - generic [ref=e212]:
+          - generic [ref=e213]:
+            - heading "Spectrogram" [level=2] [ref=e214]
+            - generic [ref=e215]:
+              - generic [ref=e216]:
+                - generic [ref=e217]: "0"
+                - generic [ref=e219]: 1 μV²
+              - button "CSA" [ref=e220] [cursor=pointer]
+              - button "QDSA" [ref=e221] [cursor=pointer]
+          - generic [ref=e222]:
+            - generic [ref=e224]: F3-P3
+            - generic [ref=e227]: P3-O1
+            - generic [ref=e230]: F3-T3
+            - generic [ref=e233]: T3-O1
+            - generic [ref=e236]: F4-P4
+            - generic [ref=e239]: P4-O2
+            - generic [ref=e242]: F4-T4
+            - generic [ref=e245]: T4-O2
+        - heading "CSA Spectral Review" [level=2] [ref=e256]
+        - heading "DSA Spectral Review" [level=2] [ref=e283]
+```

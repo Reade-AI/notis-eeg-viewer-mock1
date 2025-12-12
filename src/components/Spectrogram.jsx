@@ -100,6 +100,8 @@ export function ChannelSpectrogram({ channelIndex, channelData, channelName, the
     })
 
     // Draw spectrogram
+    // Orientation: X-axis = Time (horizontal, left to right)
+    //              Y-axis = Frequency (vertical, 0 Hz at bottom, max Hz at top)
     const cellWidth = width / timeSteps
     const cellHeight = height / freqBins
 
@@ -112,9 +114,11 @@ export function ChannelSpectrogram({ channelIndex, channelData, channelName, the
         const color = getSpectrogramColor(normalizedPower)
         
         ctx.fillStyle = color
+        // X position: time goes left to right (t * cellWidth)
+        // Y position: frequency 0 at bottom, max at top (height - (f + 1) * cellHeight)
         ctx.fillRect(
-          t * cellWidth,
-          height - (f + 1) * cellHeight,
+          t * cellWidth,                    // X-axis: Time (left to right)
+          height - (f + 1) * cellHeight,    // Y-axis: Frequency (0 at bottom, max at top)
           cellWidth,
           cellHeight
         )

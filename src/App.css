@@ -111,10 +111,11 @@
 }
 
 .csa-panel {
-  flex: 0 0 500px;
-  min-height: 500px;
+  flex: 0 0 700px;
+  min-height: 700px;
   border-bottom: 1px solid var(--border-color);
-  overflow: hidden;
+  overflow: auto;
+  box-sizing: border-box;
 }
 
 .quadrant-dsa-panel {

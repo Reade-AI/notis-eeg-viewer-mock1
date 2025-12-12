@@ -62,28 +62,51 @@ export default function CSAView({ data, theme }) {
         {csaData.map(({ channelIndex, bands }) => (
           <div key={channelIndex} className="csa-channel">
             <div className="csa-channel-label">{CHANNEL_NAMES[channelIndex]}</div>
-            <div className="csa-bars">
-              {bands.map((band, idx) => (
-                <div key={band.name} className="csa-bar-container">
-                  <div 
-                    className="csa-bar"
-                    style={{
-                      height: `${band.power * 100}%`,
-                      backgroundColor: getBandColor(band.name)
-                    }}
-                    title={`${band.name}: ${(band.power * 100).toFixed(1)}%`}
-                  />
-                  <div className="csa-bar-label">{band.name[0]}</div>
+            <div className="csa-chart-container">
+              {/* Chart area with bars */}
+              <div className="csa-chart-area">
+                {/* Y-axis: Frequency bands (vertical, bottom to top: Delta, Theta, Alpha, Beta, Gamma) */}
+                <div className="csa-y-axis">
+                  <div className="csa-y-axis-label">Frequency Band</div>
+                  <div className="csa-y-axis-ticks">
+                    {bands.map((band) => (
+                      <div key={band.name} className="csa-y-axis-tick">
+                        <span className="csa-band-label">{band.name}</span>
+                        <span className="csa-band-range">({band.min}-{band.max} Hz)</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
-            <div className="csa-frequency-labels">
-              <span>0</span>
-              <span>4</span>
-              <span>8</span>
-              <span>12</span>
-              <span>16</span>
-              <span>20</span>
+                
+                {/* Bars area */}
+                <div className="csa-bars-container">
+                  {/* X-axis grid lines */}
+                  <div className="csa-x-axis-grid">
+                    <div className="csa-grid-line" style={{ left: '0%' }}><span>0%</span></div>
+                    <div className="csa-grid-line" style={{ left: '25%' }}><span>25%</span></div>
+                    <div className="csa-grid-line" style={{ left: '50%' }}><span>50%</span></div>
+                    <div className="csa-grid-line" style={{ left: '75%' }}><span>75%</span></div>
+                    <div className="csa-grid-line" style={{ left: '100%' }}><span>100%</span></div>
+                  </div>
+                  
+                  {bands.map((band) => (
+                    <div key={band.name} className="csa-bar-row">
+                      <div 
+                        className="csa-bar"
+                        style={{
+                          width: `${band.power * 100}%`,
+                          backgroundColor: getBandColor(band.name)
+                        }}
+                        title={`${band.name}: ${(band.power * 100).toFixed(1)}%`}
+                      />
+                      <span className="csa-bar-value">{((band.power * 100).toFixed(0))}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* X-axis label */}
+              <div className="csa-x-axis-label">Normalized Power (%)</div>
             </div>
           </div>
         ))}

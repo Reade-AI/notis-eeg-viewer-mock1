@@ -1,15 +1,16 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useEEG } from '../store/EEGContext'
 import { getChannelLabel } from '../utils/montages'
 import PatientModal from './PatientModal'
 import './HeaderBar.css'
 
 export default function HeaderBar() {
-  const { settings, isStreaming, ui, actions, ischemiaEvents, currentTime, eegBuffer } = useEEG()
+  const { settings, isStreaming, ui, actions, ischemiaEvents, currentTime, eegBuffer, edfFileInfo, eegState } = useEEG()
   const { patient, system } = settings
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [patientModalOpen, setPatientModalOpen] = useState(false)
   const notificationsRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   // Close notifications when clicking outside
   useEffect(() => {
@@ -31,12 +32,15 @@ export default function HeaderBar() {
   const formatTimestamp = (seconds) => {
     const hours = Math.floor(seconds / 3600)
     const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = (seconds % 60).toFixed(1)
+    const secsValue = seconds % 60
+    const secsInt = Math.floor(secsValue)
+    const secsDecimal = (secsValue - secsInt).toFixed(1).substring(1) // Get ".X" part
+    const secs = `${secsInt.toString().padStart(2, '0')}${secsDecimal}`
     
     if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.padStart(5, '0')}`
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs}`
     }
-    return `${minutes}:${secs.padStart(5, '0')}`
+    return `${minutes}:${secs}`
   }
 
   const formatDate = (date) => {
@@ -63,7 +67,17 @@ export default function HeaderBar() {
     }
   }, [isStreaming, currentTime])
   
-  const recordingDurationFormatted = formatTimestamp(recordingDuration)
+  // When EDF is loaded, use trimmed duration (actual data length) instead of playback duration
+  const displayDuration = useMemo(() => {
+    if (eegState?.isLoaded && edfFileInfo?.trimmedDuration && !isStreaming) {
+      // Show trimmed duration (actual data length) when EDF is loaded and not streaming
+      return edfFileInfo.trimmedDuration
+    }
+    // Otherwise show current playback/streaming duration
+    return recordingDuration
+  }, [eegState?.isLoaded, edfFileInfo?.trimmedDuration, isStreaming, recordingDuration])
+  
+  const recordingDurationFormatted = formatTimestamp(displayDuration)
 
   const handleIschemiaEventClick = (event) => {
     console.log('🔍 Clicked on ischemia event:', event)
@@ -273,6 +287,20 @@ export default function HeaderBar() {
               </div>
               <span className="status-value">{isStreaming ? 'Active' : 'Stopped'}</span>
             </div>
+
+            <div className={`status-card ${eegState?.isLoaded ? 'status-active' : 'status-inactive'}`}>
+              <div className="status-header">
+                <span className="status-dot-large"></span>
+                <span className="status-label">EDF</span>
+              </div>
+              {eegState?.isLoaded ? (
+                <span className="status-value">
+                  Loaded ({formatTimestamp(edfFileInfo?.duration || eegState.durationSec || 0)})
+                </span>
+              ) : (
+                <span className="status-value">Not Loaded</span>
+              )}
+            </div>
             
             {isStreaming && (
               <div className="recording-timer">
@@ -284,9 +312,65 @@ export default function HeaderBar() {
         </div>
         
         <div className="stream-controls">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".edf"
+            style={{ display: 'none' }}
+            onChange={async (e) => {
+              const file = e.target.files[0]
+              if (!file) {
+                console.log('No file selected')
+                return
+              }
+              
+              console.log('File selected:', file.name, 'Size:', file.size, 'bytes')
+              
+              try {
+                console.log('Starting to load EDF file...')
+                await actions.loadEDFFile(file)
+                console.log('EDF file load command completed')
+              } catch (error) {
+                console.error('Failed to load EDF file:', error)
+                console.error('Error stack:', error.stack)
+                alert(`Failed to load EDF file: ${error.message}\n\nCheck console for details.`)
+              }
+              
+              // Reset input so same file can be selected again
+              e.target.value = ''
+            }}
+          />
+          <button
+            className="stream-button load-button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Load EDF file"
+          >
+            <span className="button-icon">📁</span>
+            <span className="button-text">Load EDF</span>
+          </button>
+          {eegState?.isLoaded && (
+            <button
+              className="stream-button reset-button"
+              onClick={() => {
+                if (window.confirm('Reset to live mode? This will clear the loaded EDF file.')) {
+                  actions.resetToLiveMode()
+                }
+              }}
+              title="Reset to live mode (clear EDF)"
+            >
+              <span className="button-icon">🔄</span>
+              <span className="button-text">Reset</span>
+            </button>
+          )}
           <button
             className={`stream-button start-button ${isStreaming ? 'disabled' : ''}`}
-            onClick={() => actions.startMockStream()}
+            onClick={() => {
+              if (edfFileInfo) {
+                actions.startEDFStream()
+              } else {
+                actions.startMockStream()
+              }
+            }}
             disabled={isStreaming || !system.deviceConnected}
             title="Start EEG recording"
           >
@@ -295,7 +379,13 @@ export default function HeaderBar() {
           </button>
           <button
             className={`stream-button pause-button ${!isStreaming ? 'disabled' : ''}`}
-            onClick={() => actions.stopMockStream()}
+            onClick={() => {
+              if (edfFileInfo) {
+                actions.pauseEDFStream()
+              } else {
+                actions.stopMockStream()
+              }
+            }}
             disabled={!isStreaming}
             title="Pause EEG recording"
           >
@@ -305,7 +395,11 @@ export default function HeaderBar() {
           <button
             className={`stream-button stop-button ${!isStreaming ? 'disabled' : ''}`}
             onClick={() => {
-              actions.stopMockStream()
+              if (edfFileInfo) {
+                actions.stopEDFStream()
+              } else {
+                actions.stopMockStream()
+              }
               
               // Wait a moment for stream to stop, then adjust view
               // Store the current time window before stopping to preserve user's manual setting

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { EEGProvider, useEEG } from './store/EEGContext'
 import HeaderBar from './components/HeaderBar'
 import RawEEGPlot from './components/RawEEGPlot'
@@ -8,35 +8,27 @@ import AlertBanner from './components/AlertBanner'
 import EventLog from './components/EventLog'
 import CompactEEGView from './components/CompactEEGView'
 import CSAView from './components/CSAView'
-import QuadrantDSA from './components/QuadrantDSA'
+import CSAViewAdapter from './components/CSAViewAdapter'
+import DSAViewAdapter from './components/DSAViewAdapter'
 import './App.css'
 
 function AppContent() {
-  try {
-    const { eegBuffer, ischemiaEvents, settings, ui, actions, isStreaming, currentTime } = useEEG()
+  // All hooks must be called unconditionally and in the same order
+  const { eegBuffer, ischemiaEvents, settings, ui, actions, isStreaming, currentTime } = useEEG()
 
-    // Safety check
-    if (!eegBuffer || !settings || !ui) {
-      return (
-        <div className="app" style={{ padding: '20px', color: 'white', backgroundColor: '#1a1a1a', minHeight: '100vh' }}>
-          <h1>Loading...</h1>
-        </div>
-      )
+  // Debug: log data status
+  useEffect(() => {
+    const dataLength = eegBuffer?.[0]?.length || 0
+    if (dataLength > 0) {
+      console.log('AppContent - Data status:', {
+        isStreaming,
+        currentTime: currentTime?.toFixed(2),
+        channel0Length: dataLength,
+        firstPoint: eegBuffer[0][0],
+        lastPoint: eegBuffer[0][dataLength - 1]
+      })
     }
-
-    // Debug: log data status
-    useEffect(() => {
-      const dataLength = eegBuffer[0]?.length || 0
-      if (dataLength > 0) {
-        console.log('AppContent - Data status:', {
-          isStreaming,
-          currentTime: currentTime?.toFixed(2),
-          channel0Length: dataLength,
-          firstPoint: eegBuffer[0][0],
-          lastPoint: eegBuffer[0][dataLength - 1]
-        })
-      }
-    }, [eegBuffer, isStreaming, currentTime])
+  }, [eegBuffer, isStreaming, currentTime])
 
   // Calculate spectrogram data from EEG buffer
   const calculateSpectrum = (sample, fftSize, sampleRate, channelIndex) => {
@@ -68,22 +60,48 @@ function AppContent() {
   }
 
   // Convert EEG buffer to spectrogram format
-  const spectrogramData = eegBuffer.map((channelData, channelIndex) => {
-    const fftSize = settings.spectrogram.fftSize
-    const sampleRate = 250
-    
-    // Handle empty channel data
-    if (!channelData || channelData.length === 0) {
-      return []
-    }
-    
-    // For pre-loaded data, calculate spectrum for each point
-    // In real-time, you'd use a sliding window, but for static data we can show all points
-    return channelData.map(point => ({
-      time: point.x,
-      frequencies: calculateSpectrum(point.y, fftSize, sampleRate, channelIndex)
-    }))
-  })
+  // Optimize: Use sliding window approach to prevent browser freezing
+  const spectrogramData = useMemo(() => {
+    if (!eegBuffer || !settings) return []
+    return eegBuffer.map((channelData, channelIndex) => {
+      const fftSize = settings.spectrogram.fftSize
+      const sampleRate = 250
+      
+      // Handle empty channel data
+      if (!channelData || channelData.length === 0) {
+        return []
+      }
+      
+      // Use sliding window: calculate spectrum every N samples to reduce computation
+      // For real-time streaming, we only need to update the most recent data
+      const windowSize = Math.floor(sampleRate * 0.1) // 100ms windows
+      const stepSize = Math.max(1, Math.floor(windowSize / 4)) // Overlap windows
+      
+      const spectrogramPoints = []
+      
+      // Only process recent data (last 10 seconds) for performance
+      const maxDataPoints = sampleRate * 10
+      const startIdx = Math.max(0, channelData.length - maxDataPoints)
+      const dataToProcess = channelData.slice(startIdx)
+      
+      // Process in windows
+      for (let i = 0; i < dataToProcess.length - windowSize; i += stepSize) {
+        const window = dataToProcess.slice(i, i + windowSize)
+        if (window.length < windowSize) break
+        
+        // Calculate average value in window for spectrum
+        const avgValue = window.reduce((sum, p) => sum + Math.abs(p.y), 0) / window.length
+        const centerTime = window[Math.floor(window.length / 2)].x
+        
+        spectrogramPoints.push({
+          time: centerTime,
+          frequencies: calculateSpectrum(avgValue, fftSize, sampleRate, channelIndex)
+        })
+      }
+      
+      return spectrogramPoints
+    })
+  }, [eegBuffer, settings?.spectrogram?.fftSize])
 
   // Apply theme
   useEffect(() => {
@@ -91,6 +109,15 @@ function AppContent() {
       document.documentElement.setAttribute('data-theme', ui.theme)
     }
   }, [ui?.theme])
+
+  // Safety check - after all hooks
+  if (!eegBuffer || !settings || !ui) {
+    return (
+      <div className="app" style={{ padding: '20px', color: 'white', backgroundColor: '#1a1a1a', minHeight: '100vh' }}>
+        <h1>Loading...</h1>
+      </div>
+    )
+  }
 
   // Transform ischemia events to match component expectations
   const transformedIschemiaEvents = ischemiaEvents.map(event => ({
@@ -125,16 +152,18 @@ function AppContent() {
               </div>
               {ui.csaPanelOpen && (
                 <div className="csa-panel">
-                  <CSAView 
+                  <CSAViewAdapter 
                     data={spectrogramData}
+                    eegBuffer={eegBuffer}
                     theme={ui.theme}
                   />
                 </div>
               )}
               {ui.qdsaPanelOpen && (
                 <div className="quadrant-dsa-panel">
-                  <QuadrantDSA 
+                  <DSAViewAdapter 
                     data={spectrogramData}
+                    eegBuffer={eegBuffer}
                     theme={ui.theme}
                   />
                 </div>
@@ -147,15 +176,6 @@ function AppContent() {
       </div>
     </div>
   )
-  } catch (error) {
-    console.error('Error in AppContent:', error)
-    return (
-      <div className="app" style={{ padding: '20px', color: 'white', backgroundColor: '#1a1a1a', minHeight: '100vh' }}>
-        <h1>Error loading application</h1>
-        <pre style={{ color: '#ef4444' }}>{error.toString()}</pre>
-      </div>
-    )
-  }
 }
 
 function App() {

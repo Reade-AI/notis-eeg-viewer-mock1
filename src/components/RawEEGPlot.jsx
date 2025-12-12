@@ -27,14 +27,14 @@ ChartJS.register(
 )
 
 const CHANNEL_COLORS = [
-  '#3b82f6', // Blue
-  '#3b82f6',
-  '#3b82f6',
-  '#3b82f6',
-  '#ef4444', // Red
-  '#ef4444',
-  '#ef4444',
-  '#ef4444'
+  '#2563eb', // Darker blue for better contrast
+  '#2563eb',
+  '#2563eb',
+  '#2563eb',
+  '#dc2626', // Darker red for better contrast
+  '#dc2626',
+  '#dc2626',
+  '#dc2626'
 ]
 
 function ChannelChart({ channelIndex, channelData, channelName, channelColor, ischemiaEvents, theme, settings, onPan, impedance, isBad, onToggleBad }) {
@@ -42,20 +42,25 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
   const containerRef = useRef(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  // Debug: log channel data and settings
+  // Debug: log channel data and settings (throttled to prevent infinite loops)
   useEffect(() => {
     if (channelData && channelData.length > 0) {
-      console.log(`Channel ${channelIndex} (${channelName}) data:`, {
-        length: channelData.length,
-        first: channelData[0],
-        last: channelData[channelData.length - 1],
-        timeRange: channelData.length > 0 ? `${channelData[0].x.toFixed(2)} - ${channelData[channelData.length - 1].x.toFixed(2)}` : 'N/A',
-        timeOffset: settings?.timeOffset,
-        timeWindow: settings?.timeWindow,
-        timeScale: settings?.timeScale
-      })
+      const firstPoint = channelData[0]
+      const lastPoint = channelData[channelData.length - 1]
+      const yMin = Math.min(...channelData.map(p => p.y))
+      const yMax = Math.max(...channelData.map(p => p.y))
+      const yAvg = channelData.reduce((sum, p) => sum + p.y, 0) / channelData.length
+      const nonZeroCount = channelData.filter(p => Math.abs(p.y) > 0.001).length
+      
+      console.log(`Channel ${channelIndex} (${channelName}) data:`, 
+        `length=${channelData.length}`,
+        `first: x=${firstPoint?.x.toFixed(3)}, y=${firstPoint?.y.toFixed(3)}`,
+        `last: x=${lastPoint?.x.toFixed(3)}, y=${lastPoint?.y.toFixed(3)}`,
+        `yRange: min=${yMin.toFixed(3)}, max=${yMax.toFixed(3)}, avg=${yAvg.toFixed(3)}`,
+        `nonZero=${nonZeroCount}/${channelData.length}`
+      )
     }
-  }, [channelData, channelIndex, channelName, settings?.timeOffset, settings?.timeWindow, settings?.timeScale])
+  }, [channelData?.length, channelIndex, channelName]) // Removed settings dependencies to prevent infinite loops
 
   const isInIschemia = (x) => {
     return ischemiaEvents.some(event => {
@@ -71,19 +76,68 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
   const baseTimeScale = 30
   const adjustedTimeWindow = timeWindow * (baseTimeScale / timeScale)
   
+  // Calculate Y-axis range based on sensitivity (amplitudeScale)
+  // amplitudeScale is in μV/mm, standard display is ±20mm per channel
+  const amplitudeScale = settings?.amplitudeScale || 7.0
+  const displayRangeMM = 20 // Standard 20mm display range per channel
+  const yAxisMax = (displayRangeMM / 2) * amplitudeScale
+  const yAxisMin = -yAxisMax
+  
+  // Debug log when amplitudeScale changes
+  useEffect(() => {
+    console.log(`[ChannelChart ${channelIndex}] amplitudeScale changed to:`, amplitudeScale, 'yAxisRange:', [yAxisMin, yAxisMax])
+  }, [amplitudeScale, channelIndex, yAxisMin, yAxisMax])
+  
   // Get the actual data range
   const maxTime = channelData.length > 0 ? channelData[channelData.length - 1]?.x : 0
   const actualDataMinTime = channelData.length > 0 ? channelData[0]?.x : 0
   const dataMinTime = actualDataMinTime
   const dataRange = maxTime - dataMinTime
 
+  // Downsample data for better visualization
+  // Chart.js can handle ~2000-3000 points efficiently, so we'll downsample if we have more
+  // For a 10-second window at 250 Hz, that's 2500 points - we'll limit to 2000 for smooth rendering
+  const maxPointsPerDataset = 2000 // Maximum points to render per dataset
+  const downsampleData = (points) => {
+    if (!points || points.length === 0) return []
+    if (points.length <= maxPointsPerDataset) {
+      return points
+    }
+    
+    // Simple decimation: take every Nth point
+    const step = Math.ceil(points.length / maxPointsPerDataset)
+    const downsampled = []
+    
+    for (let i = 0; i < points.length; i += step) {
+      downsampled.push(points[i])
+    }
+    
+    // Always include last point if not already included
+    if (points.length > 0 && downsampled[downsampled.length - 1] !== points[points.length - 1]) {
+      downsampled.push(points[points.length - 1])
+    }
+    
+    return downsampled
+  }
+
+  // Calculate visible range first (needed for filtering and chart scales)
+  const navigationStartTime = 0
+  const calculatedStartTime = maxTime - timeOffset - adjustedTimeWindow
+  const maxStartTime = Math.max(navigationStartTime, maxTime - adjustedTimeWindow)
+  const clampedStartTime = Math.max(navigationStartTime, Math.min(maxStartTime, calculatedStartTime))
+  const viewMinTime = Math.max(dataMinTime, clampedStartTime)
+  const viewMaxTime = Math.min(maxTime, clampedStartTime + adjustedTimeWindow)
+
+  // Filter data to visible time range first (more efficient)
+  const visibleData = channelData.filter(point => {
+    return point.x >= viewMinTime && point.x <= viewMaxTime
+  })
+
   // Split data into normal and ischemia segments
-  // Don't filter data here - let Chart.js handle rendering based on scales
-  // Chart.js will automatically clip data outside the visible range
   const normalPoints = []
   const ischemiaPoints = []
 
-  channelData.forEach(point => {
+  visibleData.forEach(point => {
     if (isInIschemia(point.x)) {
       ischemiaPoints.push(point)
     } else {
@@ -91,28 +145,43 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
     }
   })
 
+  // Downsample both datasets
+  const downsampledNormalPoints = downsampleData(normalPoints)
+  const downsampledIschemiaPoints = downsampleData(ischemiaPoints)
+
   const datasets = [
     // Normal data
     {
       label: channelName,
-      data: normalPoints,
+      data: downsampledNormalPoints,
       borderColor: channelColor,
       backgroundColor: 'transparent',
-      borderWidth: 1.5,
+      borderWidth: 1.1, // Thinner trace for clearer detail
       pointRadius: 0,
       pointHoverRadius: 0,
-      tension: 0.1
+      tension: 0,
+      segment: {
+        borderColor: (ctx) => {
+          // Ensure smooth rendering
+          return channelColor
+        }
+      }
     },
     // Ischemia data (red)
-    ...(ischemiaPoints.length > 0 ? [{
+    ...(downsampledIschemiaPoints.length > 0 ? [{
       label: `${channelName} (Ischemia)`,
-      data: ischemiaPoints,
-      borderColor: '#ef4444',
+      data: downsampledIschemiaPoints,
+      borderColor: '#dc2626', // Darker red for better contrast
       backgroundColor: 'transparent',
-      borderWidth: 2,
+      borderWidth: 1.3, // Slightly thicker than baseline to stand out
       pointRadius: 0,
       pointHoverRadius: 0,
-      tension: 0.1
+      tension: 0,
+      segment: {
+        borderColor: (ctx) => {
+          return '#dc2626'
+        }
+      }
     }] : [])
   ]
 
@@ -133,9 +202,9 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
         { x: event.start, y: yMin },
         { x: event.start, y: yMax }
       ],
-      borderColor: '#ef4444',
+      borderColor: '#dc2626', // Darker red for better contrast
       backgroundColor: 'transparent',
-      borderWidth: 2,
+      borderWidth: 1.1, // Match thinner trace style
       borderDash: [5, 5],
       pointRadius: 0,
       pointHoverRadius: 0,
@@ -152,9 +221,9 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
           { x: event.end, y: yMin },
           { x: event.end, y: yMax }
         ],
-        borderColor: '#ef4444',
+        borderColor: '#dc2626', // Darker red for better contrast
         backgroundColor: 'transparent',
-        borderWidth: 2,
+      borderWidth: 1.1, // Match thinner trace style
         borderDash: [5, 5],
         pointRadius: 0,
         pointHoverRadius: 0,
@@ -186,7 +255,7 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
         
         // Draw semi-transparent red background for ischemia region
         ctx.save()
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.15)' // Light red background
+        ctx.fillStyle = 'rgba(220, 38, 38, 0.2)' // Slightly darker and more visible red background
         ctx.fillRect(startX, yScale.top, endX - startX, yScale.bottom - yScale.top)
         ctx.restore()
       })
@@ -201,28 +270,28 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
         // Draw start label
         const startX = xScale.getPixelForValue(event.start)
         ctx.save()
-        ctx.fillStyle = '#ef4444'
+        ctx.fillStyle = '#dc2626' // Darker red for better contrast
         const startLabel = 'Start Ischemia'
+        ctx.font = '10px sans-serif' // Increased from 9px
         const startLabelWidth = ctx.measureText(startLabel).width
-        ctx.fillRect(startX - startLabelWidth / 2 - 4, yScale.top, startLabelWidth + 8, 18)
+        ctx.fillRect(startX - startLabelWidth / 2 - 4, yScale.top, startLabelWidth + 8, 20) // Slightly taller
         ctx.fillStyle = labelTextColor
-        ctx.font = '9px sans-serif'
         ctx.textAlign = 'center'
-        ctx.fillText(startLabel, startX, yScale.top + 13)
+        ctx.fillText(startLabel, startX, yScale.top + 14)
         ctx.restore()
         
         // Draw stop label if exists
         if (event.end) {
           const endX = xScale.getPixelForValue(event.end)
           ctx.save()
-          ctx.fillStyle = '#ef4444'
+          ctx.fillStyle = '#dc2626' // Darker red for better contrast
           const stopLabel = 'Stop Ischemia'
+          ctx.font = '10px sans-serif' // Increased from 9px
           const stopLabelWidth = ctx.measureText(stopLabel).width
-          ctx.fillRect(endX - stopLabelWidth / 2 - 4, yScale.bottom - 18, stopLabelWidth + 8, 18)
+          ctx.fillRect(endX - stopLabelWidth / 2 - 4, yScale.bottom - 20, stopLabelWidth + 8, 20) // Slightly taller
           ctx.fillStyle = labelTextColor
-          ctx.font = '9px sans-serif'
           ctx.textAlign = 'center'
-          ctx.fillText(stopLabel, endX, yScale.bottom - 5)
+          ctx.fillText(stopLabel, endX, yScale.bottom - 6)
           ctx.restore()
         }
       })
@@ -284,110 +353,155 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
     })
   }
 
-  // Theme-aware colors
-  const textColor = theme === 'dark' ? '#ffffff' : '#1a1a1a'
-  const textSecondaryColor = theme === 'dark' ? '#888888' : '#666666'
-  const gridColor = theme === 'dark' ? '#222222' : '#f0f0f0'
+  // Theme-aware colors - improved contrast
+  const textColor = theme === 'dark' ? '#ffffff' : '#0f172a' // Darker text for better contrast
+  const textSecondaryColor = theme === 'dark' ? '#a0a0a0' : '#475569' // More visible secondary text
+  const gridColor = theme === 'dark' ? '#333333' : '#cbd5e1' // Base grid color
+  // EEG-style grid coloring (major vs minor)
+  const xGridMajor = theme === 'dark' ? 'rgba(74, 222, 128, 0.45)' : 'rgba(52, 211, 153, 0.65)' // green-ish
+  const xGridMinor = theme === 'dark' ? 'rgba(74, 222, 128, 0.16)' : 'rgba(52, 211, 153, 0.25)'
+  const yGridMajor = theme === 'dark' ? 'rgba(74, 222, 128, 0.35)' : 'rgba(52, 211, 153, 0.45)'
+  const yGridMinor = theme === 'dark' ? 'rgba(74, 222, 128, 0.14)' : 'rgba(52, 211, 153, 0.2)'
   const tooltipBg = theme === 'dark' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.95)'
   const tooltipBorder = theme === 'dark' ? '#333' : '#e0e0e0'
 
   // Create options object - this will be recreated when settings change
-  const options = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    interaction: {
-      mode: 'index',
-      intersect: false
-    },
-    onHover: (event, activeElements) => {
-      // Change cursor to grab when hovering over chart
-      if (event.native && event.native.target) {
-        event.native.target.style.cursor = isDragging ? 'grabbing' : 'grab'
-      }
-    },
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        enabled: !isDragging, // Disable tooltip while dragging
-        backgroundColor: tooltipBg,
-        titleColor: textColor,
-        bodyColor: textColor,
-        borderColor: tooltipBorder,
-        borderWidth: 1,
-        filter: (tooltipItem) => {
-          return tooltipItem.datasetIndex < datasets.length
+  const options = useMemo(() => {
+    // Grid spacing to mimic EEG paper: major 1s vertical, minor sub-divisions; horizontal tied to sensitivity
+    const majorTimeStep = 1 // seconds
+    const minorTimeStep = adjustedTimeWindow > 20 ? 0.5 : 0.2 // denser grid on small windows
+    const xTickStep = adjustedTimeWindow > 30 ? 2 : adjustedTimeWindow > 15 ? 1 : minorTimeStep
+    
+    const yMinorStep = Math.max(0.1, amplitudeScale) // µV per small division (~1mm)
+    const yMajorStep = yMinorStep * 5 // bold line every 5 minor steps (~5mm)
+    
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      elements: {
+        line: {
+          borderJoinStyle: 'round',
+          borderCapStyle: 'round',
         }
       },
-      title: {
-        display: true,
-        text: `${channelName}${isBad ? ' [BAD]' : ''}${impedance ? ` (${impedance.value.toFixed(1)}kΩ${impedance.status !== 'good' ? ` ${impedance.status.toUpperCase()}` : ''})` : ''}`,
-        color: isBad ? '#ef4444' : (impedance?.status === 'poor' || impedance?.status === 'bad') ? '#f59e0b' : channelColor,
-        font: {
-          size: 12,
-          weight: 'bold'
-        },
-        padding: {
-          top: 4,
-          bottom: 4
-        }
-      }
-    },
-    scales: {
-      x: {
-        type: 'linear',
-        position: 'bottom',
-        title: {
-          display: channelIndex >= 6, // Only show on bottom row
-          text: 'Time (seconds)',
-          color: textColor,
-          font: {
-            size: 10
-          }
-        },
-        ticks: {
-          color: textSecondaryColor,
-          font: {
-            size: 9
-          },
-          maxTicksLimit: Math.max(3, Math.floor(adjustedTimeWindow / 2)), // More ticks for longer time windows
-          stepSize: adjustedTimeWindow > 20 ? 5 : adjustedTimeWindow > 10 ? 2 : 1
-        },
-        grid: {
-          color: gridColor,
-          lineWidth: 1
-        },
-        min: minTime,
-        max: actualMaxTime
+      interaction: {
+        mode: 'index',
+        intersect: false
       },
-      y: {
-        title: {
-          display: channelIndex % 4 === 0, // Only show on left column
-          text: 'Amplitude (μV)',
-          color: textColor,
-          font: {
-            size: 10
+      onHover: (event, activeElements) => {
+        // Change cursor to grab when hovering over chart
+        if (event.native && event.native.target) {
+          event.native.target.style.cursor = isDragging ? 'grabbing' : 'grab'
+        }
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          enabled: !isDragging, // Disable tooltip while dragging
+          backgroundColor: tooltipBg,
+          titleColor: textColor,
+          bodyColor: textColor,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          filter: (tooltipItem) => {
+            return tooltipItem.datasetIndex < datasets.length
           }
         },
-        ticks: {
-          color: textSecondaryColor,
-          font: {
-            size: 9
+          title: {
+            display: true,
+            text: `${channelName}${isBad ? ' [BAD]' : ''}${impedance && impedance.value !== null ? ` (${impedance.value.toFixed(1)}kΩ${impedance.status !== 'good' ? ` ${impedance.status.toUpperCase()}` : ''})` : ''}`,
+            color: isBad ? '#dc2626' : (impedance?.status === 'poor' || impedance?.status === 'bad') ? '#d97706' : channelColor,
+            font: {
+              size: 13, // Increased from 12
+              weight: 'bold'
+            },
+            padding: {
+              top: 4,
+              bottom: 4
+            }
+          }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          position: 'bottom',
+          title: {
+            display: channelIndex >= 6, // Only show on bottom row
+            text: 'Time (seconds)',
+            color: textColor,
+            font: {
+              size: 11 // Increased from 10
+            }
           },
-          maxTicksLimit: 5
+          ticks: {
+            color: textSecondaryColor,
+            font: {
+              size: 10 // Increased from 9
+            },
+            stepSize: xTickStep,
+            maxTicksLimit: Math.max(5, Math.floor(adjustedTimeWindow / xTickStep) + 2)
+          },
+          grid: {
+            color: (ctx) => {
+              const v = ctx.tick.value || 0
+              const isMajor = Math.abs(v / majorTimeStep - Math.round(v / majorTimeStep)) < 1e-6
+              return isMajor ? xGridMajor : xGridMinor
+            },
+            lineWidth: (ctx) => {
+              const v = ctx.tick.value || 0
+              const isMajor = Math.abs(v / majorTimeStep - Math.round(v / majorTimeStep)) < 1e-6
+              return isMajor ? 1.2 : 0.6
+            },
+            drawBorder: true,
+            borderColor: gridColor
+          },
+          min: minTime,
+          max: actualMaxTime
         },
-        grid: {
-          color: gridColor,
-          lineWidth: 1
-        },
-        min: -100,
-        max: 100
+        y: {
+          title: {
+            display: channelIndex % 4 === 0, // Only show on left column
+            text: 'Amplitude (μV)',
+            color: textColor,
+            font: {
+              size: 11 // Increased from 10
+            }
+          },
+          ticks: {
+            color: textSecondaryColor,
+            font: {
+              size: 10 // Increased from 9
+            },
+            stepSize: yMinorStep,
+            maxTicksLimit: Math.max(6, Math.floor((yAxisMax - yAxisMin) / yMinorStep))
+          },
+          grid: {
+            color: (ctx) => {
+              const v = ctx.tick.value || 0
+              const isMajor = Math.abs(v / yMajorStep - Math.round(v / yMajorStep)) < 1e-6
+              return isMajor ? yGridMajor : yGridMinor
+            },
+            lineWidth: (ctx) => {
+              const v = ctx.tick.value || 0
+              const isMajor = Math.abs(v / yMajorStep - Math.round(v / yMajorStep)) < 1e-6
+              return isMajor ? 1.1 : 0.5
+            },
+            drawBorder: true,
+            borderColor: gridColor
+          },
+          min: yAxisMin,
+          max: yAxisMax
+        }
       }
     }
-  }), [channelIndex, channelName, channelColor, textColor, textSecondaryColor, gridColor, tooltipBg, tooltipBorder, minTime, actualMaxTime, adjustedTimeWindow, datasets.length, theme, timeScale, timeWindow, timeOffset, isDragging])
+  }, [channelIndex, channelName, channelColor, textColor, textSecondaryColor, gridColor, tooltipBg, tooltipBorder, minTime, actualMaxTime, adjustedTimeWindow, datasets.length, theme, timeScale, timeWindow, timeOffset, isDragging, yAxisMin, yAxisMax, amplitudeScale, xGridMajor, xGridMinor, yGridMajor, yGridMinor])
 
+  // Track last update values to prevent infinite loops
+  const lastUpdateRef = useRef({ minTime: null, maxTime: null, timeOffset: null })
+  
   // Update chart when timeOffset or other relevant settings change
   useEffect(() => {
     if (chartRef.current && channelData && channelData.length > 0) {
@@ -407,36 +521,55 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
           const newMinTime = Math.max(currentDataMinTime, clampedStartTime)
           const newMaxTime = Math.min(currentMaxTime, clampedStartTime + adjustedTimeWindow)
           
-          // Always update to ensure chart reflects current timeOffset
-          console.log(`[Channel ${channelIndex}] Updating chart scales:`, {
-            oldMin: chart.scales.x.min,
-            oldMax: chart.scales.x.max,
-            newMinTime,
-            newMaxTime,
-            timeOffset,
-            settingsTimeOffset: settings?.timeOffset,
-            calculatedStartTime,
-            clampedStartTime,
-            currentMaxTime,
-            adjustedTimeWindow
-          })
-          chart.scales.x.min = newMinTime
-          chart.scales.x.max = newMaxTime
-          chart.update('none')
+          // Only update if values actually changed to prevent infinite loops
+          const lastUpdate = lastUpdateRef.current
+          if (lastUpdate.minTime !== newMinTime || lastUpdate.maxTime !== newMaxTime || lastUpdate.timeOffset !== timeOffset) {
+            console.log(`[Channel ${channelIndex}] Updating chart scales:`, 
+              `minTime: ${newMinTime.toFixed(3)}, maxTime: ${newMaxTime.toFixed(3)}, timeOffset: ${timeOffset.toFixed(3)}`
+            )
+            chart.scales.x.min = newMinTime
+            chart.scales.x.max = newMaxTime
+            chart.update('none')
+            
+            // Update ref to track last values
+            lastUpdateRef.current = { minTime: newMinTime, maxTime: newMaxTime, timeOffset }
+          }
         }
       }
     }
   }, [timeOffset, maxTime, adjustedTimeWindow, dataMinTime, channelIndex, settings?.timeOffset, channelData?.length])
   
-  // Update chart when options change
+  // Update chart when options change (including filter changes)
   useEffect(() => {
     if (chartRef.current && options) {
       const chart = chartRef.current
       // Update chart with new options
       chart.options = options
-      chart.update('none')
+      // Use 'active' mode to ensure visual updates
+      chart.update('active')
     }
-  }, [options, channelData, ischemiaEvents])
+  }, [options, channelData, ischemiaEvents, settings?.filters?.highPass, settings?.filters?.lowPass, settings?.filters?.notch])
+  
+  // Explicitly update Y-axis scale when amplitudeScale changes
+  useEffect(() => {
+    if (chartRef.current && chartRef.current.scales && chartRef.current.scales.y) {
+      const chart = chartRef.current
+      console.log(`[ChannelChart ${channelIndex}] Updating Y-axis scale:`, { yAxisMin, yAxisMax, amplitudeScale })
+      
+      // Update the scale configuration
+      if (chart.options && chart.options.scales && chart.options.scales.y) {
+        chart.options.scales.y.min = yAxisMin
+        chart.options.scales.y.max = yAxisMax
+      }
+      
+      // Update the scale directly
+      chart.scales.y.min = yAxisMin
+      chart.scales.y.max = yAxisMax
+      
+      // Force a full update to ensure the chart re-renders
+      chart.update('active')
+    }
+  }, [yAxisMin, yAxisMax, amplitudeScale, channelIndex])
 
   // Handle mouse events for dragging on the container
   useEffect(() => {
@@ -549,8 +682,13 @@ function ChannelChart({ channelIndex, channelData, channelName, channelColor, is
 }
 
 export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
-  const { settings, actions, currentTime, isStreaming, channelImpedance, badChannels } = useEEG()
+  const { settings, actions, currentTime, isStreaming, channelImpedance, badChannels, eegState, edfFileInfo } = useEEG()
   const { display, detection } = settings
+  
+  // Debug: log display.amplitudeScale to verify it's updating
+  useEffect(() => {
+    console.log('[RawEEGPlot] display.amplitudeScale:', display.amplitudeScale, 'Type:', typeof display.amplitudeScale)
+  }, [display.amplitudeScale])
   const [sliderValue, setSliderValue] = useState(0)
 
   const formatTime = (seconds) => {
@@ -565,9 +703,15 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
   }
   
   // Filter channels based on visibility and bad channels
+  // Handle variable channel counts (e.g., EDF files with different number of channels)
   const visibleChannels = data
     .map((channelData, index) => ({ channelData, index }))
-    .filter(({ index: idx }) => display.channelVisibility[idx] && !badChannels?.[idx])
+    .filter(({ index: idx }) => {
+      // Default to visible if channelVisibility array doesn't have this index
+      const isVisible = display.channelVisibility?.[idx] !== false
+      const isBad = badChannels?.[idx] === true
+      return isVisible && !isBad
+    })
 
   const handleTimeScaleChange = (newScale) => {
     // Allow time scale from 1 to 1000
@@ -686,12 +830,16 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
   const maxTime = data.length > 0 && data[0].length > 0 ? data[0][data[0].length - 1]?.x : 0
   // Get the actual minimum time from the data (buffer might be trimmed)
   const actualDataMinTime = data.length > 0 && data[0].length > 0 ? data[0][0]?.x : 0
-  // For navigation: use 0 as the conceptual start (mock stream starts from 0)
-  // For display: use actualDataMinTime to show where data actually exists
-  // This allows navigation from 0s even if buffer was trimmed during streaming
-  const navigationStartTime = 0 // Always assume data starts from 0 for navigation
+  
+  // Account for trimmed time offset when EDF is loaded (padding zeros removed)
+  const trimmedTimeOffset = eegState?.trimmedTimeOffset || 0
+  
+  // For navigation: use trimmedTimeOffset as the start when EDF is loaded (to match actual data start)
+  // For mock streaming: use 0 as the conceptual start
+  // This ensures timeline shows correct times that match the data
+  const navigationStartTime = eegState?.isLoaded ? trimmedTimeOffset : 0
   const dataMinTime = actualDataMinTime // Use actual start for display
-  const navigationDataRange = maxTime - navigationStartTime // Full range from 0 to maxTime
+  const navigationDataRange = maxTime - navigationStartTime // Full range from trimmed offset to maxTime
   const dataRange = maxTime - dataMinTime // Actual available data range
   const adjustedTimeWindow = display.timeWindow * (30 / display.timeScale)
   // maxOffset: maximum offset to still show data (0 = most recent, maxOffset = oldest visible)
@@ -738,9 +886,9 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
     const currentTimeWindow = display.timeWindow ?? 10
     const currentTimeScale = display.timeScale ?? 30
     
-    // Use maxTime calculated from data (already available in component scope)
+    // Use maxTime and navigationStartTime calculated from data (already available in component scope)
     const currentMaxTime = maxTime
-    const currentNavigationStartTime = 0
+    const currentNavigationStartTime = navigationStartTime // Use the navigationStartTime that accounts for trimmed offset
     
     // Recalculate adjustedTimeWindow with current values
     const currentAdjustedTimeWindow = currentTimeWindow * (30 / currentTimeScale)
@@ -750,8 +898,7 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
     const maxStartTime = Math.max(currentNavigationStartTime, currentMaxTime - currentAdjustedTimeWindow)
     const clampedStartTime = Math.max(currentNavigationStartTime, Math.min(maxStartTime, calculatedStartTime))
     
-    // For view range text, use navigationStartTime (0s) instead of dataMinTime
-    // to show the conceptual range, not the actual buffered data range
+    // For view range text, use navigationStartTime (which accounts for trimmed offset) to show correct times
     const viewStartTime = Math.max(currentNavigationStartTime, clampedStartTime)
     const viewEndTime = Math.min(currentMaxTime, clampedStartTime + currentAdjustedTimeWindow)
     
@@ -759,7 +906,7 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
       start: viewStartTime.toFixed(1),
       end: viewEndTime.toFixed(1)
     }
-  }, [display.timeOffset, display.timeWindow, display.timeScale, maxTime])
+  }, [display.timeOffset, display.timeWindow, display.timeScale, maxTime, navigationStartTime])
 
   // Sync slider value with settings.timeOffset when it changes
   useEffect(() => {
@@ -796,7 +943,10 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
           <select 
             className="control-dropdown"
             value={display.montage || 'BANANA'}
-            onChange={(e) => actions.updateSettings('display', { montage: e.target.value })}
+            onChange={(e) => {
+              console.log('[RawEEGPlot] Changing montage from', display.montage, 'to', e.target.value)
+              actions.updateSettings('display', { montage: e.target.value })
+            }}
             title="Montage"
           >
             <option value="BANANA">BANANA</option>
@@ -807,10 +957,14 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
           
           <select 
             className="control-dropdown"
-            value={display.filters.highPass}
-            onChange={(e) => actions.updateSettings('display', { 
-              filters: { ...display.filters, highPass: parseFloat(e.target.value) }
-            })}
+            value={display.filters.highPass ? display.filters.highPass.toFixed(1) : '1.0'}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value)
+              console.log('[RawEEGPlot] Changing highPass filter from', display.filters.highPass, 'to', newValue)
+              actions.updateSettings('display', { 
+                filters: { ...display.filters, highPass: newValue }
+              })
+            }}
             title="Low Frequency Filter"
           >
             <option value="0.1">LFF 0.1 Hz</option>
@@ -821,10 +975,14 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
           
           <select 
             className="control-dropdown"
-            value={display.filters.lowPass}
-            onChange={(e) => actions.updateSettings('display', { 
-              filters: { ...display.filters, lowPass: parseFloat(e.target.value) }
-            })}
+            value={String(display.filters.lowPass || 30)}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value)
+              console.log('[RawEEGPlot] Changing lowPass filter from', display.filters.lowPass, 'to', newValue)
+              actions.updateSettings('display', { 
+                filters: { ...display.filters, lowPass: newValue }
+              })
+            }}
             title="High Frequency Filter"
           >
             <option value="15">HFF 15 Hz</option>
@@ -835,10 +993,14 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
           
           <select 
             className="control-dropdown"
-            value={display.filters.notch || 60}
-            onChange={(e) => actions.updateSettings('display', { 
-              filters: { ...display.filters, notch: parseFloat(e.target.value) }
-            })}
+            value={String(display.filters.notch || 60)}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value)
+              console.log('[RawEEGPlot] Changing notch filter from', display.filters.notch, 'to', newValue)
+              actions.updateSettings('display', { 
+                filters: { ...display.filters, notch: newValue }
+              })
+            }}
             title="Notch Filter"
           >
             <option value="0">Notch Off</option>
@@ -848,12 +1010,18 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
           
           <select 
             className="control-dropdown"
-            value={display.amplitudeScale}
-            onChange={(e) => actions.updateSettings('display', { amplitudeScale: parseFloat(e.target.value) })}
+            value={display.amplitudeScale ? display.amplitudeScale.toFixed(1) : '7.0'}
+            onChange={(e) => {
+              const newValue = parseFloat(e.target.value)
+              console.log('[RawEEGPlot] Changing amplitudeScale from', display.amplitudeScale, 'to', newValue)
+              console.log('[RawEEGPlot] Dropdown value:', e.target.value, 'Parsed:', newValue)
+              actions.updateSettings('display', { amplitudeScale: newValue })
+            }}
             title="Sensitivity"
           >
             <option value="2.5">Sensitivity 2.5 uV/mm</option>
             <option value="5.0">Sensitivity 5.0 uV/mm</option>
+            <option value="7.0">Sensitivity 7.0 uV/mm</option>
             <option value="10.0">Sensitivity 10.0 uV/mm</option>
             <option value="20.0">Sensitivity 20.0 uV/mm</option>
           </select>
@@ -879,7 +1047,7 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
               max="1000"
               step="1"
             />
-            <span className="control-label">s/page</span>
+            <span className="control-label">mm/sec</span>
             <button 
               className="control-button"
               onClick={() => handleTimeScaleIncrement(5)}
@@ -1055,7 +1223,7 @@ export default function RawEEGPlot({ data, ischemiaEvents, theme }) {
       <div className="channels-grid">
         {visibleChannels.map(({ channelData, index }) => (
           <ChannelChart
-            key={`${index}-${display.timeScale}-${display.timeWindow}-${display.timeOffset}`}
+            key={`${index}-${display.timeScale}-${display.timeWindow}-${display.timeOffset}-${display.amplitudeScale}-${display.montage}-${display.filters.highPass}-${display.filters.lowPass}-${display.filters.notch}`}
             channelIndex={index}
             channelData={channelData}
             channelName={getChannelLabel(display.montage, index)}

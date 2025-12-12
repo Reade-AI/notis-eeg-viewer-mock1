@@ -55,7 +55,7 @@ This is a mock ischemia detection viewer for operating room (OR) use. The applic
 - **Montage:** Change between BANANA, 10-20, BIPOLAR, REFERENCE
 - **Filters:** Adjust Low Frequency Filter (LFF), High Frequency Filter (HFF), Notch Filter
 - **Sensitivity:** Change amplitude scale (2.5, 5.0, 10.0, 20.0 μV/mm)
-- **Timebase:** Adjust time scale (s/page)
+- **Timebase:** Adjust time scale (mm/sec)
 - **Time Window:** Change visible time window (5-120 seconds)
 - **Timeline Navigation:** Use the slider to navigate through recorded data
 

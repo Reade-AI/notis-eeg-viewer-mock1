@@ -169,11 +169,12 @@
 .channel-chart {
   position: relative;
   background-color: var(--bg-panel);
-  border: 1px solid var(--border-color);
+  border: 1.5px solid var(--border-color); /* Thicker border */
   border-radius: 4px;
   min-height: 150px;
-  padding: 8px;
+  padding: 10px; /* Increased padding */
   transition: background-color 0.3s ease, border-color 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
 }
 
 .channel-chart canvas {
